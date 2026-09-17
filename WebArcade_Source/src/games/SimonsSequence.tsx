@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { GameWrapper } from '../components/GameWrapper';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { soundManager } from '../utils/audio';
 
 const COLORS = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-400'];
 const ACTIVE_COLORS = ['bg-red-300', 'bg-blue-300', 'bg-green-300', 'bg-yellow-200'];
@@ -31,15 +32,30 @@ export function SimonsSequence({ onBack }: Props) {
       if (gameState !== 'playing') break; // Handle unmount/gameover during playback
       
       setActiveButton(currentSeq[i]);
-      // Play sound here if we had sounds
+      // Play a distinct note for each color
+      const freqs = [261.63, 329.63, 392.00, 523.25]; // C, E, G, C(high)
+      soundManager.playBeep(freqs[currentSeq[i]], 'sine', 0.4, 0.1);
       
       await new Promise(resolve => setTimeout(resolve, 500));
       setActiveButton(null);
       await new Promise(resolve => setTimeout(resolve, 200));
     }
-    
     setIsPlayingSequence(false);
   }, [gameState]);
+
+  useEffect(() => {
+    // Start a new sequence when moving to playing state or leveling up
+    if (gameState === 'playing' && sequence.length === 0) {
+      setIsPlayingSequence(true); // immediately show WATCH text
+      const newColor = Math.floor(Math.random() * 4);
+      setSequence([newColor]);
+      
+      // Delay the first flash slightly so the player is ready
+      setTimeout(() => {
+        playSequence([newColor]);
+      }, 500);
+    }
+  }, [gameState, sequence.length, playSequence]);
 
   const nextRound = useCallback((currentSeq: number[]) => {
     const nextColor = Math.floor(Math.random() * 4);
@@ -55,7 +71,7 @@ export function SimonsSequence({ onBack }: Props) {
     setSequence([]);
     setPlayerIndex(0);
     setActiveButton(null);
-    nextRound([]);
+    // Removed nextRound([]) so that the useEffect handles the first color properly!
   };
 
   const handleGameOver = useCallback(() => {
@@ -69,6 +85,9 @@ export function SimonsSequence({ onBack }: Props) {
     if (isPlayingSequence || gameState !== 'playing') return;
 
     setActiveButton(index);
+    const freqs = [261.63, 329.63, 392.00, 523.25];
+    soundManager.playBeep(freqs[index], 'sine', 0.2, 0.1);
+
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => setActiveButton(null), 200);
 
